@@ -1,4 +1,8 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Student } from './student.entity';
@@ -11,6 +15,7 @@ export class StudentsService {
     private readonly repo: Repository<Student>,
   ) {}
 
+  // CREATE STUDENT
   async create(dto: CreateStudentDto) {
     try {
       const student = this.repo.create(dto);
@@ -19,10 +24,49 @@ export class StudentsService {
       if (error?.code === '23505') {
         throw new ConflictException('Email already exists');
       }
+
       throw error;
     }
   }
 
+  // EDIT / UPDATE STUDENT
+  async update(id: number, dto: CreateStudentDto) {
+    const student = await this.repo.findOne({
+      where: { id },
+    });
+
+    if (!student) {
+      throw new NotFoundException('Student not found');
+    }
+
+    try {
+      Object.assign(student, dto);
+
+      return await this.repo.save(student);
+    } catch (error: any) {
+      if (error?.code === '23505') {
+        throw new ConflictException('Email already exists');
+      }
+
+      throw error;
+    }
+  }
+  async remove(id: number) {
+  const student = await this.repo.findOne({
+    where: { id },
+  });
+
+  if (!student) {
+    throw new NotFoundException('Student not found');
+  }
+
+  await this.repo.remove(student);
+
+  return {
+    message: 'Student deleted successfully',
+  };
+}
+  // SEARCH + PAGINATION
   async search(
     search?: string,
     cgpaMin?: string,

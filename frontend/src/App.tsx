@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Search, Plus, X } from 'lucide-react';
+import { Search, Plus, X, Pencil, Trash2 } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
-
 type Student = {
   id: number;
   name: string;
@@ -9,7 +8,6 @@ type Student = {
   department: string;
   cgpa: number;
 };
-
 type StudentsResponse = {
   data: Student[];
   total: number;
@@ -17,57 +15,47 @@ type StudentsResponse = {
   limit: number;
   totalPages: number;
 };
-
 const API = 'http://localhost:3000/api/students';
-
 export default function App() {
   const [students, setStudents] = useState<Student[]>([]);
   const [search, setSearch] = useState('');
   const [cgpaMin, setCgpaMin] = useState('');
   const [page, setPage] = useState(1);
-  const [limit] = useState(20);
+  const [limit, setLimit] = useState(20);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [loading, setLoading] = useState(false);
-
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [form, setForm] = useState({
     name: '',
     email: '',
     department: '',
     cgpa: '',
   });
-
   useEffect(() => {
     setPage(1);
   }, [search, cgpaMin]);
-
   useEffect(() => {
     const timer = setTimeout(() => {
       fetchStudents();
     }, 500);
-
     return () => clearTimeout(timer);
-  }, [search, cgpaMin, page]);
-
+  }, [search, cgpaMin, page, limit]);
   async function fetchStudents() {
     setLoading(true);
-
     try {
       const params = new URLSearchParams({
         page: String(page),
         limit: String(limit),
       });
-
       if (search.trim()) {
         params.set('search', search.trim());
       }
-
       if (cgpaMin) {
         params.set('cgpa_min', cgpaMin);
       }
-
       const response = await fetch(`${API}?${params.toString()}`);
 
       if (!response.ok) {
@@ -87,6 +75,7 @@ export default function App() {
     }
   }
 
+  // CREATE STUDENT
   async function createStudent(event: React.FormEvent) {
     event.preventDefault();
     setSaving(true);
@@ -113,12 +102,14 @@ export default function App() {
       }
 
       toast.success('Student created successfully.');
+
       setForm({
         name: '',
         email: '',
         department: '',
         cgpa: '',
       });
+
       setShowForm(false);
       setPage(1);
       await fetchStudents();
@@ -129,6 +120,116 @@ export default function App() {
     }
   }
 
+  // DELETE STUDENT
+  async function deleteStudent(id: number) {
+    const confirmed = window.confirm(
+      'Are you sure you want to delete this student?'
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API}/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'x-role': 'admin',
+        },
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || 'Failed to delete student');
+      }
+
+      toast.success('Student deleted successfully.');
+
+      await fetchStudents();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to delete student.');
+    }
+  }
+
+  // OPEN EDIT FORM
+  function openEditForm(student: Student) {
+    setEditingStudent(student);
+
+    setForm({
+      name: student.name,
+      email: student.email,
+      department: student.department,
+      cgpa: String(student.cgpa),
+    });
+
+    setShowForm(true);
+  }
+
+  // UPDATE STUDENT
+  async function updateStudent(event: React.FormEvent) {
+    event.preventDefault();
+
+    if (!editingStudent) {
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      const response = await fetch(`${API}/${editingStudent.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-role': 'admin',
+        },
+        body: JSON.stringify({
+          name: form.name.trim(),
+          email: form.email.trim(),
+          department: form.department.trim(),
+          cgpa: Number(form.cgpa),
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || 'Failed to update student');
+      }
+
+      toast.success('Student updated successfully.');
+
+      setForm({
+        name: '',
+        email: '',
+        department: '',
+        cgpa: '',
+      });
+
+      setEditingStudent(null);
+      setShowForm(false);
+
+      await fetchStudents();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to update student.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // CLOSE FORM
+  function closeForm() {
+    setShowForm(false);
+    setEditingStudent(null);
+
+    setForm({
+      name: '',
+      email: '',
+      department: '',
+      cgpa: '',
+    });
+  }
+
   const visibleStudents = [...students].sort((a, b) => a.id - b.id);
 
   return (
@@ -136,17 +237,29 @@ export default function App() {
       <Toaster richColors position="top-right" />
 
       <div className="mx-auto max-w-7xl">
+
+        {/* HEADER */}
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">
               Student Management
             </h1>
-        
           </div>
 
           <button
             type="button"
-            onClick={() => setShowForm(true)}
+            onClick={() => {
+              setEditingStudent(null);
+
+              setForm({
+                name: '',
+                email: '',
+                department: '',
+                cgpa: '',
+              });
+
+              setShowForm(true);
+            }}
             className="flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2.5 font-medium text-white hover:bg-gray-800"
           >
             <Plus size={18} />
@@ -154,11 +267,13 @@ export default function App() {
           </button>
         </div>
 
+        {/* SEARCH + FILTER */}
         <div className="mb-5 flex flex-wrap gap-4 rounded-xl bg-white p-5 shadow">
+
           <div className="relative min-w-[280px] flex-1">
             <Search
               className="absolute left-3 top-3 text-gray-400"
-              size={20}
+              
             />
 
             <input
@@ -180,6 +295,18 @@ export default function App() {
             className="w-48 rounded-lg border px-3 py-2.5 outline-none"
           />
 
+          <input
+            type="number"
+            min="1"
+            value={limit}
+            onChange={(event) => {
+              setLimit(Number(event.target.value));
+              setPage(1);
+            }}
+            className="w-32 rounded-lg border px-4 py-2.5"
+            placeholder="Limit"
+          />
+
           <button
             type="button"
             onClick={() => {
@@ -192,7 +319,9 @@ export default function App() {
           </button>
         </div>
 
+        {/* STUDENT TABLE */}
         <div className="overflow-hidden rounded-xl bg-white shadow">
+
           <div className="flex flex-wrap justify-between gap-2 border-b p-4">
             <span className="font-medium">
               {loading ? 'Searching...' : `${total} students found`}
@@ -205,10 +334,21 @@ export default function App() {
 
           <div className="overflow-x-auto">
             <table className="w-full">
+
               <thead className="bg-gray-100">
                 <tr>
-                  {['ID', 'Name', 'Email', 'Department', 'CGPA'].map((heading) => (
-                    <th key={heading} className="p-4 text-left">
+                  {[
+                    'ID',
+                    'Name',
+                    'Email',
+                    'Department',
+                    'CGPA',
+                    'Options',
+                  ].map((heading) => (
+                    <th
+                      key={heading}
+                      className="p-4 text-left"
+                    >
                       {heading}
                     </th>
                   ))}
@@ -217,19 +357,63 @@ export default function App() {
 
               <tbody>
                 {visibleStudents.map((student) => (
-                  <tr key={student.id} className="border-t hover:bg-gray-50">
-                    <td className="p-4">{student.id}</td>
-                    <td className="p-4 font-medium">{student.name}</td>
-                    <td className="p-4">{student.email}</td>
-                    <td className="p-4">{student.department}</td>
-                    <td className="p-4">{student.cgpa}</td>
+                  <tr
+                    key={student.id}
+                    className="border-t hover:bg-gray-50"
+                  >
+                    <td className="p-4">
+                      {student.id}
+                    </td>
+
+                    <td className="p-4 font-medium">
+                      {student.name}
+                    </td>
+
+                    <td className="p-4">
+                      {student.email}
+                    </td>
+
+                    <td className="p-4">
+                      {student.department}
+                    </td>
+
+                    <td className="p-4">
+                      {student.cgpa}
+                    </td>
+
+                    {/* EDIT + DELETE */}
+                    <td className="p-4">
+                      <div className="flex gap-2">
+
+                        {/* EDIT */}
+                        <button
+                          type="button"
+                          onClick={() => openEditForm(student)}
+                          className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm hover:bg-gray-100"
+                        >
+                          <Pencil size={16} />
+                          Edit
+                        </button>
+
+                        {/* DELETE */}
+                        <button
+                          type="button"
+                          onClick={() => deleteStudent(student.id)}
+                          className="flex items-center gap-2 rounded-lg border border-red-300 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                        >
+                          <Trash2 size={16} />
+                          Delete
+                        </button>
+
+                      </div>
+                    </td>
                   </tr>
                 ))}
 
                 {!loading && visibleStudents.length === 0 && (
                   <tr>
                     <td
-                      colSpan={5}
+                      colSpan={6}
                       className="p-10 text-center text-gray-500"
                     >
                       No students found
@@ -237,15 +421,19 @@ export default function App() {
                   </tr>
                 )}
               </tbody>
+
             </table>
           </div>
 
+          {/* PAGINATION */}
           <div className="flex flex-wrap items-center justify-between gap-3 border-t p-4">
+
             <span className="text-sm text-gray-500">
               Page {page} of {totalPages || 1}
             </span>
 
             <div className="flex gap-2">
+
               <button
                 type="button"
                 disabled={page <= 1 || loading}
@@ -263,60 +451,89 @@ export default function App() {
               >
                 Next
               </button>
+
             </div>
           </div>
         </div>
       </div>
 
+      {/* CREATE / EDIT FORM */}
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+
           <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+
             <div className="mb-5 flex items-center justify-between">
+
               <h2 className="text-xl font-bold">
-                Create Student
+                {editingStudent
+                  ? 'Edit Student'
+                  : 'Create Student'}
               </h2>
 
               <button
                 type="button"
-                onClick={() => setShowForm(false)}
+                onClick={closeForm}
                 className="rounded-lg p-2 hover:bg-gray-100"
               >
                 <X size={20} />
               </button>
+
             </div>
 
-            <form onSubmit={createStudent} className="space-y-4">
+            <form
+              onSubmit={
+                editingStudent
+                  ? updateStudent
+                  : createStudent
+              }
+              className="space-y-4"
+            >
+
+              {/* NAME */}
               <input
                 required
                 value={form.name}
                 onChange={(event) =>
-                  setForm({ ...form, name: event.target.value })
+                  setForm({
+                    ...form,
+                    name: event.target.value,
+                  })
                 }
                 placeholder="Student name"
                 className="w-full rounded-lg border px-3 py-2.5"
               />
 
+              {/* EMAIL */}
               <input
                 required
                 type="email"
                 value={form.email}
                 onChange={(event) =>
-                  setForm({ ...form, email: event.target.value })
+                  setForm({
+                    ...form,
+                    email: event.target.value,
+                  })
                 }
                 placeholder="Email"
                 className="w-full rounded-lg border px-3 py-2.5"
               />
 
+              {/* DEPARTMENT */}
               <input
                 required
                 value={form.department}
                 onChange={(event) =>
-                  setForm({ ...form, department: event.target.value })
+                  setForm({
+                    ...form,
+                    department: event.target.value,
+                  })
                 }
                 placeholder="Department"
                 className="w-full rounded-lg border px-3 py-2.5"
               />
 
+              {/* CGPA */}
               <input
                 required
                 type="number"
@@ -325,19 +542,30 @@ export default function App() {
                 step="0.1"
                 value={form.cgpa}
                 onChange={(event) =>
-                  setForm({ ...form, cgpa: event.target.value })
+                  setForm({
+                    ...form,
+                    cgpa: event.target.value,
+                  })
                 }
                 placeholder="CGPA"
                 className="w-full rounded-lg border px-3 py-2.5"
               />
 
+              {/* SUBMIT */}
               <button
                 type="submit"
                 disabled={saving}
                 className="w-full rounded-lg bg-gray-900 px-4 py-2.5 font-medium text-white disabled:opacity-50"
               >
-                {saving ? 'Saving...' : 'Create Student'}
+                {saving
+                  ? editingStudent
+                    ? 'Updating...'
+                    : 'Saving...'
+                  : editingStudent
+                    ? 'Update Student'
+                    : 'Create Student'}
               </button>
+
             </form>
           </div>
         </div>
