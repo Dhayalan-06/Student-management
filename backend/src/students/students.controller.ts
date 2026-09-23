@@ -9,6 +9,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+
 import { AdminGuard } from './admin.guard';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { SearchStudentsDto } from './dto/search-students.dto';
@@ -18,6 +19,7 @@ import { StudentsService } from './students.service';
 export class StudentsController {
   constructor(private readonly service: StudentsService) {}
 
+  // GET - Search, Filter, Pagination
   @Get()
   findAll(@Query() query: SearchStudentsDto) {
     const page = query.page ? Number(query.page) : 1;
@@ -31,9 +33,27 @@ export class StudentsController {
     );
   }
 
+  // POST - Create Student
   @Post()
   @UseGuards(AdminGuard)
   create(@Body() dto: CreateStudentDto) {
     return this.service.create(dto);
+  }
+
+  // PUT - Edit Student
+  @Put(':id')
+  @UseGuards(AdminGuard)
+  update(
+    @Param('id') id: string,
+    @Body() dto: CreateStudentDto,
+  ) {
+    return this.service.update(Number(id), dto);
+  }
+
+  // DELETE - Delete Student
+  @Delete(':id')
+  @UseGuards(AdminGuard)
+  remove(@Param('id') id: string) {
+    return this.service.remove(Number(id));
   }
 }
