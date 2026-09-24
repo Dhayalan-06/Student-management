@@ -132,7 +132,7 @@ export default function App() {
 
     try {
       const response = await fetch(`${API}/${id}`, {
-        method: 'DELETE',
+        method: 'POST',
         headers: {
           'x-role': 'admin',
         },
