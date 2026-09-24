@@ -49,11 +49,8 @@ export class StudentsController {
   ) {
     return this.service.update(Number(id), dto);
   }
-
-  // DELETE - Delete Student
-  @Delete(':id')
-  @UseGuards(AdminGuard)
-  remove(@Param('id') id: string) {
-    return this.service.remove(Number(id));
-  }
+@Post('delete/:id')
+deleteStudent(@Param('id') id: number) {
+  return this.service.deleteStudent(id);
+}
 }

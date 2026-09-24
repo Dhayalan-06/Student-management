@@ -51,7 +51,7 @@ export class StudentsService {
       throw error;
     }
   }
-  async remove(id: number) {
+ async deleteStudent(id: number) {
   const student = await this.repo.findOne({
     where: { id },
   });
